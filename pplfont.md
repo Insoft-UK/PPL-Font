@@ -1,10 +1,3 @@
-### HD44780.h
-<img src="https://github.com/Insoft-UK/PrimeSDK/blob/main/assets/HD44780.png" width="20%" >
-
-```
-pplfont HD44780.h
-```
-
 The HP Prime stores its glyph data as a list of 64-bit unsigned integers. The bitmap, however, is stored in a specific bit order (little-endian) and where each byte of the 64-bit value is mirror-flipped.
 
 e.g.
