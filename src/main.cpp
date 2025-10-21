@@ -71,11 +71,12 @@ static bool ppl = false;
 
 // MARK: - Command Line
 void version(void) {
-    std::cout << "Insoft "<< NAME << " version, " << VERSION_NUMBER << " (BUILD " << VERSION_CODE << ")\n";
-    std::cout << "Copyright (C) " << YEAR << " Insoft.\n";
-    std::cout << "Built on: " << DATE << "\n";
-    std::cout << "Licence: MIT License\n\n";
-    std::cout << "For more information, visit: http://www.insoft.uk\n";
+    std::cout 
+    << "Insoft "<< NAME << " version, " << VERSION_NUMBER << " (BUILD " << VERSION_CODE << ")\n"
+    << "Copyright (C) " << YEAR << " Insoft.\n"
+    << "Built on: " << DATE << "\n"
+    << "Licence: MIT License\n\n"
+    << "For more information, visit: http://www.insoft.uk\n";
 }
 
 void error(void) {
@@ -84,30 +85,47 @@ void error(void) {
 }
 
 void info(void) {
-    std::cout << "Insoft "<< NAME << " version, " << VERSION_NUMBER << "\n";
-    std::cout << "Copyright (C) " << YEAR << " Insoft.\n\n";
+    using namespace std;
+    std::cout
+    << "          ***********     \n"
+    << "        ************      \n"
+    << "      ************        \n"
+    << "    ************  **      \n"
+    << "  ************  ******    \n"
+    << "************  **********  \n"
+    << "**********    ************\n"
+    << "************    **********\n"
+    << "  **********  ************\n"
+    << "    ******  ************  \n"
+    << "      **  ************    \n"
+    << "        ************      \n"
+    << "      ************        \n"
+    << "    ************          \n\n"
+    << "Copyright (C) 2023-" << YEAR << " Insoft.\n"
+    << "Insoft " << NAME << "\n\n";
 }
 
 void help(void) {
-    std::cout << "Insoft "<< NAME << " version, " << VERSION_NUMBER << " (BUILD " << VERSION_CODE << ")\n";
-    std::cout << "Copyright (C) " << YEAR << " Insoft.\n";
-    std::cout << "\n";
-    std::cout << "Usage: " << COMMAND_NAME << " <input-file> [-o <output-file>] [-n <name>] [-v flags]\n";
-    std::cout << "\n";
-    std::cout << "Options:\n";
-    std::cout << "  -o <output-file>   Specify the filename for generated .hpprgm file.\n";
-    std::cout << "  -n <name>          Font name.\n";
-    std::cout << "  -v                 Enable verbose output for detailed processing information.\n";
-    std::cout << "\n";
-    std::cout << "Verbose Flags:\n";
-    std::cout << "  f                  Font details.\n";
-    std::cout << "  g                  Glyph details.\n";
-    std::cout << "\n";
-    std::cout << "Additional Commands:\n";
-    std::cout << "  " << COMMAND_NAME << " {--version | --help}\n";
-    std::cout << "    --version        Display version information.\n";
-    std::cout << "    --help           Show this help message.\n";
-    std::cout << "    --ppl            Only esesntial PPL code.\n";
+    std::cout 
+    << "Insoft "<< NAME << " version, " << VERSION_NUMBER << " (BUILD " << VERSION_CODE << ")\n"
+    << "Copyright (C) " << YEAR << " Insoft.\n"
+    << "\n"
+    << "Usage: " << COMMAND_NAME << " <input-file> [-o <output-file>] [-n <name>] [-v flags]\n"
+    << "\n"
+    << "Options:\n"
+    << "  -o <output-file>   Specify the filename for generated .hpprgm file.\n"
+    << "  -n <name>          Font name.\n"
+    << "  -v                 Enable verbose output for detailed processing information.\n"
+    << "\n"
+    << "Verbose Flags:\n"
+    << "  f                  Font details.\n"
+    << "  g                  Glyph details.\n"
+    << "\n"
+    << "Additional Commands:\n"
+    << "  " << COMMAND_NAME << " {--version | --help}\n"
+    << "    --version        Display version information.\n"
+    << "    --help           Show this help message.\n"
+    << "    --ppl            Only esesntial PPL code.\n";
 }
 
 // MARK: -
@@ -449,6 +467,13 @@ int main(int argc, const char **argv)
         out_filename = std::filesystem::path(in_filename).parent_path();
         out_filename.append("/");
         out_filename.append(std::filesystem::path(in_filename).stem().string());
+    } else {
+        if (std::filesystem::is_directory(out_filename)) {
+            /* User did not specify specify an output filename but has specified a path, so append
+             with the input filename and subtitute the extension with .prgm
+             */
+            out_filename = std::filesystem::path(out_filename).append(std::filesystem::path(in_filename).stem().string() + ".prgm");
+        }
     }
     
     std::string in_extension = std::filesystem::path(in_filename).extension();
@@ -499,20 +524,18 @@ int main(int argc, const char **argv)
             }
             
             if (std::filesystem::exists(out_filename)) {
-                std::cout << "Adafruit GFX Font for HP Prime " << std::filesystem::path(out_filename).filename() << " has been succefuly created.\n";
+                std::cout << "✅ Adafruit GFX Font for HP Prime " << std::filesystem::path(out_filename).filename() << " has been succefuly created.\n";
             } else {
-                std::cout << "Adafruit GFX Font for HP Prime " << std::filesystem::path(out_filename).filename() << " was not created successfully.\n";
+                std::cout << "❌ Adafruit GFX Font for HP Prime " << std::filesystem::path(out_filename).filename() << " was not created successfully.\n";
             }
             
             return 0;
         }
         
-        std::cout << "Error: For ‘" << in_extension << "’ input file, the output file must have a ‘.hpprgm’ extension. Please choose a valid output file type.\n";
+        std::cout << "❌ Error: For ‘" << in_extension << "’ input file, the input file must have a ‘.h’ extension.\n";
         return 0;
     }
-
-    
-    std::cout << "Error: The specified input ‘" << std::filesystem::path(in_filename).filename() << "‘ file is invalid or not supported. Please ensure the file exists and has a valid format.\n";
+    std::cout << "❌ Error: The specified input ‘" << std::filesystem::path(in_filename).filename() << "‘ file is invalid or not supported. Please ensure the file exists and has a valid format.\n";
     
     return 0;
 }
