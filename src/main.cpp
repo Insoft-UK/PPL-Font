@@ -26,8 +26,7 @@
 #include <regex>
 #include <fstream>
 #include <iomanip>
-#include "../../PrimePlus/src/utf.hpp"
-
+#include "utf.hpp"
 
 typedef struct {
     uint16_t   bitmapOffset;    // Offset address into the bitmap data.
@@ -71,7 +70,7 @@ static bool ppl = false;
 
 // MARK: - Command Line
 void version(void) {
-    std::cout 
+    std::cerr
     << "Insoft "<< NAME << " version, " << VERSION_NUMBER << " (BUILD " << VERSION_CODE << ")\n"
     << "Copyright (C) " << YEAR << " Insoft.\n"
     << "Built on: " << DATE << "\n"
@@ -80,13 +79,13 @@ void version(void) {
 }
 
 void error(void) {
-    std::cout << COMMAND_NAME << ": try '" << COMMAND_NAME << " --help' for more information\n";
+    std::cerr << COMMAND_NAME << ": try '" << COMMAND_NAME << " --help' for more information\n";
     exit(0);
 }
 
 void info(void) {
     using namespace std;
-    std::cout
+    std::cerr
     << "          ***********     \n"
     << "        ************      \n"
     << "      ************        \n"
@@ -106,7 +105,7 @@ void info(void) {
 }
 
 void help(void) {
-    std::cout 
+    std::cerr
     << "Insoft "<< NAME << " version, " << VERSION_NUMBER << " (BUILD " << VERSION_CODE << ")\n"
     << "Copyright (C) " << YEAR << " Insoft.\n"
     << "\n"
@@ -242,7 +241,7 @@ static bool parseHAdafruitFont(const std::string &filename, TAdafruitFont &font)
             s = match.suffix().str();
         }
     } else {
-        std::cout << "Failed to find <Bitmap Data>.\n";
+        std::cerr << "Failed to find <Bitmap Data>.\n";
         return false;
     }
     
@@ -259,7 +258,7 @@ static bool parseHAdafruitFont(const std::string &filename, TAdafruitFont &font)
         s = match.suffix().str();
     }
     if (font.glyphs.empty()) {
-        std::cout << "Failed to find <Glyph Table>.\n";
+        std::cerr << "Failed to find <Glyph Table>.\n";
         return false;
     }
     
@@ -268,7 +267,7 @@ static bool parseHAdafruitFont(const std::string &filename, TAdafruitFont &font)
         font.last = parseNumber(match.str(2));
         font.yAdvance = parseNumber(match.str(3));
     } else {
-        std::cout << "Failed to find <Font>.\n";
+        std::cerr << "Failed to find <Font>.\n";
         return false;
     }
     
@@ -305,7 +304,7 @@ static std::string createPPLList(const void *data, const size_t lengthInBytes, c
          must convert between big-endian and little-endian.
          */
         if (le) n = swap_endian<uint64_t>(n);
-#endif
+#endif // !__LITTLE_ENDIAN__
 
         if (count) os << ", ";
         if (count % columns == 0) {
@@ -356,7 +355,7 @@ static std::string createHpprgmAdafruitFont(TAdafruitFont &adafruitFont, std::st
        << " },{\n"
        << createPPLList(adafruitFont.glyphs.data(), adafruitFont.glyphs.size() * sizeof(TGlyph), 16) << "\n"
        << " }, " << (int)adafruitFont.first << ", " << (int)adafruitFont.last << ", " << (int)adafruitFont.yAdvance << "\n"
-       << "};";
+       << "};\n";
     
     return os.str();
 }
@@ -433,24 +432,19 @@ int main(int argc, const char **argv)
         }
         
         in_filename = std::filesystem::expand_tilde(argv[n]);
+        if (std::filesystem::path(in_filename).parent_path().empty()) {
+            in_filename = in_filename.insert(0, "./");
+        }
     }
     
-    if (std::filesystem::path(in_filename).parent_path().empty()) {
-        in_filename = in_filename.insert(0, "./");
-    }
+    info();
+    
     
     if (name.empty()) {
         name = std::filesystem::path(in_filename).stem().string();
     }
     
-    
 
-    /*
-     Initially, we display the command-line application’s basic information,
-     including its name, version, and copyright details.
-     */
-    if (out_filename != "/dev/stdout") info();
-    
     /*
      If the input file does not have an extension, default is .h is applied.
      */
@@ -505,7 +499,7 @@ int main(int argc, const char **argv)
      process will be halted and an error message returned to the user.
      */
     if (in_filename == out_filename) {
-        std::cout << "Error: The output file must differ from the input file. Please specify a different output file name.\n";
+        std::cerr << "Error: The output file must differ from the input file. Please specify a different output file name.\n";
         return 0;
     }
     
@@ -517,25 +511,24 @@ int main(int argc, const char **argv)
         if (out_extension == ".prgm" || out_filename == "/dev/stdout") {
             std::string content = convertAdafruitFontToHpprgm(in_filename, out_filename, name);
             if (out_filename == "/dev/stdout") {
-                std::cout << content;
-                return 0;
+                utf::save(out_filename, content);
             } else {
                 utf::save(out_filename, utf::utf16(content), utf::BOMle);
             }
             
             if (std::filesystem::exists(out_filename)) {
-                std::cout << "✅ Adafruit GFX Font for HP Prime " << std::filesystem::path(out_filename).filename() << " has been succefuly created.\n";
+                std::cerr << "✅ Adafruit GFX Font for HP Prime " << std::filesystem::path(out_filename).filename() << " has been succefuly created.\n";
             } else {
-                std::cout << "❌ Adafruit GFX Font for HP Prime " << std::filesystem::path(out_filename).filename() << " was not created successfully.\n";
+                std::cerr << "❌ Adafruit GFX Font for HP Prime " << std::filesystem::path(out_filename).filename() << " was not created successfully.\n";
             }
             
             return 0;
         }
         
-        std::cout << "❌ Error: For ‘" << in_extension << "’ input file, the input file must have a ‘.h’ extension.\n";
+        std::cerr << "❌ Error: For ‘" << in_extension << "’ input file, the input file must have a ‘.h’ extension.\n";
         return 0;
     }
-    std::cout << "❌ Error: The specified input ‘" << std::filesystem::path(in_filename).filename() << "‘ file is invalid or not supported. Please ensure the file exists and has a valid format.\n";
+    std::cerr << "❌ Error: The specified input ‘" << std::filesystem::path(in_filename).filename() << "‘ file is invalid or not supported. Please ensure the file exists and has a valid format.\n";
     
     return 0;
 }
