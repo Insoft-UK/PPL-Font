@@ -22,6 +22,7 @@
 
 #include <iostream>
 #include <sstream>
+#include <filesystem>
 #include <vector>
 #include <regex>
 #include <fstream>
@@ -71,7 +72,7 @@ static bool ppl = false;
 // MARK: - Command Line
 void version(void) {
     std::cerr
-    << "Insoft "<< NAME << " version, " << VERSION_NUMBER << " (BUILD " << VERSION_CODE << ")\n"
+    << "Insoft "<< NAME << " version, " << VERSION_NUMBER << " (BUILD " << BUNDLE_VERSION << ")\n"
     << "Copyright (C) " << YEAR << " Insoft.\n"
     << "Built on: " << DATE << "\n"
     << "Licence: MIT License\n\n"
@@ -106,7 +107,7 @@ void info(void) {
 
 void help(void) {
     std::cerr
-    << "Insoft "<< NAME << " version, " << VERSION_NUMBER << " (BUILD " << VERSION_CODE << ")\n"
+    << "Insoft "<< NAME << " version, " << VERSION_NUMBER << " (BUILD " << BUNDLE_VERSION << ")\n"
     << "Copyright (C) " << YEAR << " Insoft.\n"
     << "\n"
     << "Usage: " << COMMAND_NAME << " <input-file> [-o <output-file>] [-n <name>] [-v flags]\n"
@@ -130,22 +131,22 @@ void help(void) {
 // MARK: -
 // MARK: - Extensions
 
-namespace std::filesystem {
-    std::filesystem::path expand_tilde(const std::filesystem::path& path) {
-        if (!path.empty() && path.string().starts_with("~")) {
+
+std::filesystem::path expand_tilde(const std::filesystem::path& path) {
+    if (!path.empty() && path.string().starts_with("~")) {
 #ifdef _WIN32
-            const char* home = std::getenv("USERPROFILE");
+        const char* home = std::getenv("USERPROFILE");
 #else
-            const char* home = std::getenv("HOME");
+        const char* home = std::getenv("HOME");
 #endif
-            
-            if (home) {
-                return std::filesystem::path(std::string(home) + path.string().substr(1));  // Replace '~' with $HOME
-            }
+        
+        if (home) {
+            return std::filesystem::path(std::string(home) + path.string().substr(1));  // Replace '~' with $HOME
         }
-        return path;  // return as-is if no tilde or no HOME
     }
+    return path;  // return as-is if no tilde or no HOME
 }
+
 
 #if __cplusplus >= 202302L
     #include <bit>
@@ -297,14 +298,14 @@ static std::string createPPLList(const void *data, const size_t lengthInBytes, c
             n = std::byteswap<uint64_t>(n);
         }
         
-#ifndef __LITTLE_ENDIAN__
+#ifdef __BIG_ENDIAN__
         /*
          This platform utilizes big-endian, not little-endian. To ensure
          that data is processed correctly when generating the list, we
          must convert between big-endian and little-endian.
          */
-        if (le) n = swap_endian<uint64_t>(n);
-#endif // !__LITTLE_ENDIAN__
+        if (le) n = std::byteswap<uint64_t>(n);
+#endif // __BIG_ENDIAN__
 
         if (count) os << ", ";
         if (count % columns == 0) {
@@ -366,7 +367,7 @@ static std::string convertAdafruitFontToHpprgm(std::string &in_filename, std::st
     std::string str;
     
     if (!parseHAdafruitFont(in_filename, adafruitFont)) {
-        std::cout << "Failed to find valid Adafruit Font data.\n";
+        std::cerr << "Failed to find valid Adafruit Font data.\n";
         exit(2);
     }
 
@@ -374,19 +375,20 @@ static std::string convertAdafruitFontToHpprgm(std::string &in_filename, std::st
     return str;
 }
 
-
-
 // MARK: - Main
 
 int main(int argc, const char **argv)
 {
+    namespace fs = std::filesystem;
+    
     if (argc == 1) {
         error();
         return 0;
     }
     
     std::string args(argv[0]);
-    std::string in_filename, out_filename, name, prefix, sufix;
+    std::string name, prefix, sufix;
+    std::filesystem::path inpath, outpath;
 
     for( int n = 1; n < argc; n++ ) {
         if (*argv[n] == '-') {
@@ -394,8 +396,8 @@ int main(int argc, const char **argv)
             
             if (args == "-o") {
                 if (++n > argc) error();
-                out_filename = argv[n];
-                if (out_filename == "-") out_filename = "/dev/stdout";
+                outpath = fs::path(argv[n]);
+                outpath = expand_tilde(outpath);
                 continue;
             }
 
@@ -431,25 +433,27 @@ int main(int argc, const char **argv)
             return 0;
         }
         
-        in_filename = std::filesystem::expand_tilde(argv[n]);
-        if (std::filesystem::path(in_filename).parent_path().empty()) {
-            in_filename = in_filename.insert(0, "./");
-        }
+        inpath = fs::path(argv[n]);
+        inpath = expand_tilde(inpath);
     }
     
-    info();
+    if (inpath != "/dev/stdout") info();
+    
+    if (inpath.parent_path().empty()) {
+        inpath = fs::path("./") / inpath;
+    }
     
     
     if (name.empty()) {
-        name = std::filesystem::path(in_filename).stem().string();
+        name = inpath.stem().string();
     }
     
 
     /*
      If the input file does not have an extension, default is .h is applied.
      */
-    if (std::filesystem::path(in_filename).extension().empty()) {
-        in_filename.append(".h");
+    if (inpath.extension().empty()) {
+        inpath.replace_extension("h");
     }
     
     
@@ -457,20 +461,18 @@ int main(int argc, const char **argv)
      If no output file is specified, the program will use the input file’s name
      (excluding its extension) as the output file name.
      */
-    if (out_filename.empty() || out_filename == in_filename) {
-        out_filename = std::filesystem::path(in_filename).parent_path();
-        out_filename.append("/");
-        out_filename.append(std::filesystem::path(in_filename).stem().string());
+    if (outpath.empty() || outpath == inpath) {
+        outpath = inpath.parent_path() / inpath.stem();
     } else {
-        if (std::filesystem::is_directory(out_filename)) {
+        if (std::filesystem::is_directory(outpath)) {
             /* User did not specify specify an output filename but has specified a path, so append
              with the input filename and subtitute the extension with .prgm
              */
-            out_filename = std::filesystem::path(out_filename).append(std::filesystem::path(in_filename).stem().string() + ".prgm");
+            outpath = outpath / (inpath.stem().string() + ".prgm");
         }
     }
     
-    std::string in_extension = std::filesystem::path(in_filename).extension();
+//    std::string in_extension = inpath.extension();
     
     /*
      If the output file does not have an extension, a default is applied based on
@@ -479,26 +481,26 @@ int main(int argc, const char **argv)
      • For an input file with a .h extension, the default output extension is .prgm.
      • For an input file with a .hpprgm extension, the default output extension is .h.
      */
-    if (std::filesystem::path(out_filename).extension().empty() && out_filename != "/dev/stdout") {
-        out_filename.append(".prgm");
+    if (outpath.extension().empty() && outpath != "/dev/stdout") {
+        outpath.replace_extension("prgm");
     }
     
-    std::string out_extension = std::filesystem::path(out_filename).extension();
+//    std::string out_extension = std::filesystem::path(out_filename).extension();
     
     /*
      We need to ensure that the specified output filename includes a path.
      If no path is provided, we prepend the path from the input file.
      */
-    if (std::filesystem::path(out_filename).parent_path().empty()) {
-        out_filename.insert(0, "/");
-        out_filename.insert(0, std::filesystem::path(in_filename).parent_path());
+    if (outpath.parent_path().empty()) {
+        outpath = inpath.parent_path() / outpath.filename();
     }
     
+   
     /*
      The output file must differ from the input file. If they are the same, the
      process will be halted and an error message returned to the user.
      */
-    if (in_filename == out_filename) {
+    if (inpath == outpath) {
         std::cerr << "Error: The output file must differ from the input file. Please specify a different output file name.\n";
         return 0;
     }
@@ -507,28 +509,30 @@ int main(int argc, const char **argv)
      If the input file is a .h file, the output must be either .prgm or .ppl;
      otherwise, the process is halted and an error is reported to the user.
      */
-    if (in_extension == ".h") {
-        if (out_extension == ".prgm" || out_filename == "/dev/stdout") {
+    if (inpath.extension() == ".h") {
+        if (outpath.extension() == ".prgm" || outpath == "/dev/stdout") {
+            auto in_filename = inpath.string();
+            auto out_filename = outpath.string();
             std::string content = convertAdafruitFontToHpprgm(in_filename, out_filename, name);
-            if (out_filename == "/dev/stdout") {
-                utf::save(out_filename, content);
+            if (outpath == "/dev/stdout") {
+                utf::save(outpath, content);
             } else {
-                utf::save(out_filename, utf::utf16(content), utf::BOMle);
+                utf::save(outpath, utf::utf16(content), utf::BOMle);
             }
             
-            if (std::filesystem::exists(out_filename)) {
-                std::cerr << "✅ Adafruit GFX Font for HP Prime " << std::filesystem::path(out_filename).filename() << " has been succefuly created.\n";
+            if (std::filesystem::exists(outpath)) {
+                std::cerr << "✅ Adafruit GFX Font for HP Prime " << outpath.filename() << " has been succefuly created.\n";
             } else {
-                std::cerr << "❌ Adafruit GFX Font for HP Prime " << std::filesystem::path(out_filename).filename() << " was not created successfully.\n";
+                std::cerr << "❌ Adafruit GFX Font for HP Prime " << outpath.filename() << " was not created successfully.\n";
             }
             
             return 0;
         }
         
-        std::cerr << "❌ Error: For ‘" << in_extension << "’ input file, the input file must have a ‘.h’ extension.\n";
+        std::cerr << "❌ Error: For ‘" << inpath.extension() << "’ input file, the input file must have a ‘.h’ extension.\n";
         return 0;
     }
-    std::cerr << "❌ Error: The specified input ‘" << std::filesystem::path(in_filename).filename() << "‘ file is invalid or not supported. Please ensure the file exists and has a valid format.\n";
+    std::cerr << "❌ Error: The specified input ‘" << inpath.filename() << "‘ file is invalid or not supported. Please ensure the file exists and has a valid format.\n";
     
     return 0;
 }
