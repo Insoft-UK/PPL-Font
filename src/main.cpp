@@ -437,7 +437,7 @@ int main(int argc, const char **argv)
         inpath = expand_tilde(inpath);
     }
     
-    if (inpath != "/dev/stdout") info();
+    if (outpath != "/dev/stdout") info();
     
     if (inpath.parent_path().empty()) {
         inpath = fs::path("./") / inpath;
@@ -472,8 +472,7 @@ int main(int argc, const char **argv)
         }
     }
     
-//    std::string in_extension = inpath.extension();
-    
+
     /*
      If the output file does not have an extension, a default is applied based on
      the input file’s extension:
@@ -485,8 +484,7 @@ int main(int argc, const char **argv)
         outpath.replace_extension("prgm");
     }
     
-//    std::string out_extension = std::filesystem::path(out_filename).extension();
-    
+
     /*
      We need to ensure that the specified output filename includes a path.
      If no path is provided, we prepend the path from the input file.
